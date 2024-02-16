@@ -39,8 +39,13 @@ int main()
 
 	// Loop over all values of the array, counting those divisible by some number.
 	int count = 0;
-	for( i=0; i<N; i++ )
-		if( a[i]%DIV == 0 ) count++;
+	#pragma omp for
+	for( i=0; i<N; i++ ) {
+		if( a[i]%DIV == 0 )  {
+			# pragma omp atomic
+			count++;
+		}
+	}	
 
 	// Output the result and timing.
 	double us = omp_get_wtime() - startTime;
