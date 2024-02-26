@@ -71,12 +71,15 @@ int main( int argc, char **argv )
 	int i;
 	for( i=0; i<N; i++ ) sendData[i] = (rank+1)*(i+1);
 
-	// Send data 'cyclically to the right' (i.e. to rank+1, with wrap-around).
-	MPI_Send( sendData, N, MPI_INT, ( rank==numProcs-1 ? 0 : rank+1 ), 0, MPI_COMM_WORLD );
-
-	// Receive data 'from the left'. Here use a status object but do nothing with it (could also replace &status with MPI_STATUS_IGNORE).
+	// stagger the sends and recieved based on the rank of the process
 	MPI_Status status;
-	MPI_Recv( recvData, N, MPI_INT, ( rank==0 ? numProcs-1 : rank-1 ), 0, MPI_COMM_WORLD, &status );
+	if (rank%2) {
+		MPI_Recv( recvData, N, MPI_INT, ( rank==0 ? numProcs-1 : rank-1 ), 0, MPI_COMM_WORLD, &status );
+		MPI_Send( sendData, N, MPI_INT, ( rank==numProcs-1 ? 0 : rank+1 ), 0, MPI_COMM_WORLD );
+	} else {
+		MPI_Send( sendData, N, MPI_INT, ( rank==numProcs-1 ? 0 : rank+1 ), 0, MPI_COMM_WORLD );
+		MPI_Recv( recvData, N, MPI_INT, ( rank==0 ? numProcs-1 : rank-1 ), 0, MPI_COMM_WORLD, &status );
+	}
 
 	//
 	// Check the result
