@@ -96,12 +96,18 @@ int main( int argc, char **argv )
 			MPI_Recv( &localSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
 		}
 	} else {
-		// collective communication using mpi_scatter
+		// collective communication using mpi_scatter	// exercise 4 code
 		MPI_Scatter(
 			&globalSize, 1, MPI_INT, // sent from
 			&localSize, 1, MPI_INT,  // recieved to 
 			0, MPI_COMM_WORLD		 // source rank 0
 		);
+		// collective communication using mpi_gather	// exercise 3 code
+		// MPI_Gather(
+		// 	&localSize, 1, MPI_INT,   // sent from
+		// 	&globalSize, 1, MPI_INT,  // recieved to
+		// 	0, MPI_COMM_WORLD		  // source rank 0
+		// );
 	}
 
 	// All ranks can now allocate memory for their local arrays.
