@@ -36,12 +36,12 @@
 int rank, numProcs;
 
 // Window / view paraneters.
-const int windowSize_x = 600;
-const int windowSize_y = 600;
+const int windowSize_x = 2000;
+const int windowSize_y = 2000;
 
 // Number of pixels to calculate; can be less than the window size.
-#define numPixels_x 200
-#define numPixels_y 200
+#define numPixels_x 1000
+#define numPixels_y 1000
 
 // The maximum number iterations per pixel. Small values result in faster code but less well defined images.
 const int maxIters = 300000;
