@@ -86,7 +86,12 @@ int main( int argc, char **argv )
 	displayGrid( grid, rank, p );
 
 	// For left and right boundaries, use a temporary array to extract single columns.
-	float *column = (float*) malloc( local_L*sizeof(float) );
+	//float *column = (float*) malloc( local_L*sizeof(float) );
+	float
+		*leftColumnSend  = (float*) malloc( local_L*sizeof(float) ),
+		*leftColumnRecv  = (float*) malloc( local_L*sizeof(float) ),
+		*rightColumnSend = (float*) malloc( local_L*sizeof(float) ),
+		*rightColumnRecv = (float*) malloc( local_L*sizeof(float) );
 
 	// Start the timer.
 	double startTime = MPI_Wtime();
@@ -100,45 +105,43 @@ int main( int argc, char **argv )
 		// Get the row and column for 'this' rank in the partitioned domain.
 		int rowBlock = rank / p, colBlock = rank % p;
 
-		//
-		// Synchronise the ghost cells.
-		//
+		//========== START NON BLOCKING COMMUNICATION ==========//
+
+		MPI_Request upperSendRequest, upperRecvRequest, lowerSendRequest, lowerRecvRequest, leftSendRequest, leftRecvRequest, rightSendRequest, rightRecvRequest;
 
 		// Upper boundary.
-		if( rowBlock>0   ) MPI_Send( &grid[_index(        1,1)], local_L, MPI_FLOAT, rank-p, 0, MPI_COMM_WORLD );
-		if( rowBlock<p-1 ) MPI_Recv( &grid[_index(local_L+1,1)], local_L, MPI_FLOAT, rank+p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+		if( rowBlock>0   ) MPI_Isend( &grid[_index(        1,1)], local_L, MPI_FLOAT, rank-p, 0, MPI_COMM_WORLD, &upperSendRequest );
+		if( rowBlock<p-1 ) MPI_Irecv( &grid[_index(local_L+1,1)], local_L, MPI_FLOAT, rank+p, 0, MPI_COMM_WORLD, &upperRecvRequest );
 
 		// Lower boundary.
-		if( rowBlock<p-1 ) MPI_Send( &grid[_index(local_L,1)], local_L, MPI_FLOAT, rank+p, 0, MPI_COMM_WORLD );
-		if( rowBlock>0   ) MPI_Recv( &grid[_index(      0,1)], local_L, MPI_FLOAT, rank-p, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+		if( rowBlock<p-1 ) MPI_Isend( &grid[_index(local_L,1)], local_L, MPI_FLOAT, rank+p, 0, MPI_COMM_WORLD, &lowerSendRequest );
+		if( rowBlock>0   ) MPI_Irecv( &grid[_index(      0,1)], local_L, MPI_FLOAT, rank-p, 0, MPI_COMM_WORLD, &lowerRecvRequest );
 
 		// Left boundary.
 		if( colBlock>0 )
 		{
-			for( row=1; row<local_L+1; row++ ) column[row-1] = grid[_index(row,1)];
-			MPI_Send( column, local_L, MPI_FLOAT, rank-1, 0, MPI_COMM_WORLD );
+			for( row=1; row<local_L+1; row++ ) leftColumnSend[row-1] = grid[_index(row,1)];
+			MPI_Isend( leftColumnSend, local_L, MPI_FLOAT, rank-1, 0, MPI_COMM_WORLD, &leftSendRequest );
 		}
 		if( colBlock<p-1 )
 		{
-			MPI_Recv( column, local_L, MPI_FLOAT, rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-			for( row=1; row<local_L+1; row++ ) grid[_index(row,local_L+1)] = column[row-1];
+			MPI_Irecv( leftColumnRecv, local_L, MPI_FLOAT, rank+1, 0, MPI_COMM_WORLD, &leftRecvRequest );
 		}
 
 		// Right boundary.
 		if( colBlock<p-1 )
 		{
-			for( row=1; row<local_L+1; row++ ) column[row-1] = grid[_index(row,local_L)];
-			MPI_Send( column, local_L, MPI_FLOAT, rank+1, 0, MPI_COMM_WORLD );
+			for( row=1; row<local_L+1; row++ ) rightColumnSend[row-1] = grid[_index(row,local_L)];
+			MPI_Isend( rightColumnSend, local_L, MPI_FLOAT, rank+1, 0, MPI_COMM_WORLD, &rightSendRequest );
 		}
 		if( colBlock>0 )
 		{
-			MPI_Recv( column, local_L, MPI_FLOAT, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
-			for( row=1; row<local_L+1; row++ ) grid[_index(row,0)] = column[row-1];
+			MPI_Irecv( rightColumnRecv, local_L, MPI_FLOAT, rank-1, 0, MPI_COMM_WORLD, &rightRecvRequest );
 		}
 
-		//
-		// Perform the calculations, split into interior and edge points to help with the conversion to non-blocking.
-		//
+		//========== START NON BLOCKING COMMUNICATION ==========//
+
+		//========== DOMAIN INTERIOR ==========//
 
 		// First update the interior grid points (using a Jacobi iteration).
 		for( row=2; row<local_L; row++ )
@@ -150,6 +153,25 @@ int main( int argc, char **argv )
 										+ grid[_index(row  ,col-1)]
 									);
 
+		//========== DOMAIN INTERIOR ==========//
+
+		//========== SYNCHRONISE NON BLOCKING COMMUNICATION ==========//
+		
+		if( rowBlock<p-1 ) MPI_Wait( &upperRecvRequest, MPI_STATUS_IGNORE );
+		if( rowBlock>0   ) MPI_Wait( &lowerRecvRequest, MPI_STATUS_IGNORE );
+		if( colBlock<p-1 ) {
+			MPI_Wait( &leftRecvRequest , MPI_STATUS_IGNORE );
+			for( row=1; row<local_L+1; row++ ) grid[_index(row,local_L+1)] = leftColumnRecv [row-1];
+		}
+		if( colBlock<0 ) {
+			MPI_Wait( &rightRecvRequest, MPI_STATUS_IGNORE );
+			for( row=1; row<local_L+1; row++ ) grid[_index(row,        0)] = rightColumnRecv[row-1];
+		}
+
+		//========== SYNCHRONISE NON BLOCKING COMMUNICATION ==========//
+
+		//========== DOMAIN EDGE ==========//
+
 		// Now update the edge cells, i.e. those that need to read the ghost cells.
 		for( row=1; row<local_L+1; row++ )
 			for( col=1; col<local_L+1; col++ )
@@ -160,6 +182,14 @@ int main( int argc, char **argv )
 											+ grid[_index(row  ,col+1)]
 											+ grid[_index(row  ,col-1)]
 										);
+
+		//========== DOMAIN EDGE ==========//
+
+		// Why do you you need to wait here when we know the requests have been wated for
+		if( rowBlock>0   ) MPI_Wait( &upperSendRequest, MPI_STATUS_IGNORE );
+		if( rowBlock<p-1 ) MPI_Wait( &lowerSendRequest, MPI_STATUS_IGNORE );
+		if( colBlock>0   ) MPI_Wait( &leftSendRequest, MPI_STATUS_IGNORE );
+		if( colBlock<p-1 ) MPI_Wait( &rightSendRequest, MPI_STATUS_IGNORE );
 	}
 
 	// Calculate how long the calculation took.
@@ -174,7 +204,10 @@ int main( int argc, char **argv )
 	// Clear up and quit.
 	//
 	free( grid );
-	free( column );
+	// free( leftColumnSend );
+	// free( leftColumnRecv );
+	// free( rightColumnSend );
+	// free( rightColumnRecv );
 	MPI_Finalize();
 	return EXIT_SUCCESS;
 }
