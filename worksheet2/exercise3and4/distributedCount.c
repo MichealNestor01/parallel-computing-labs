@@ -97,17 +97,18 @@ int main( int argc, char **argv )
 		}
 	} else {
 		// collective communication using mpi_scatter	// exercise 4 code
-		MPI_Scatter(
-			&globalSize, 1, MPI_INT, // sent from
-			&localSize, 1, MPI_INT,  // recieved to 
-			0, MPI_COMM_WORLD		 // source rank 0
-		);
-		// collective communication using mpi_gather	// exercise 3 code
-		// MPI_Gather(
-		// 	&localSize, 1, MPI_INT,   // sent from
-		// 	&globalSize, 1, MPI_INT,  // recieved to
-		// 	0, MPI_COMM_WORLD		  // source rank 0
+		// MPI_Scatter(
+		// 	globalSize, 1, MPI_INT, // sent from
+		// 	localSize, 1, MPI_INT,  // recieved to 
+		// 	0, MPI_COMM_WORLD		 // source rank 0
 		// );
+		//collective communication using mpi_gather	// exercise 3 code
+		if (rank == 0) localSize = globalSize / numProcs;
+		MPI_Bcast(
+			&localSize, 1, MPI_INT,  // recieved to
+			0, MPI_COMM_WORLD		  // source rank 0
+		);
+		printf("Rank %d has local size %d\n", rank, localSize);
 	}
 
 	// All ranks can now allocate memory for their local arrays.
