@@ -12,7 +12,7 @@ ifeq ($(OS), Linux)
 	MSG += or \'module load mpi/openmpi-x86_64\' \(Centos\). If you then get an error \'GLFW/glfw3.h: No such file or directory\', try \'module load glfw\'.
 	MSG += If running on a school Centos machine \(e.g. feng-linux\), you will also need to change \'-lglfw3\' to \'-lglfw\' in the makefile,
 	MSG += otherwise you will get a \'cannot find -glfw3\' error message.
-	CCFLAGS += -lm -lX11 -ldl -lGL -lglfw3
+	CCFLAGS += -lm -lX11 -ldl -lGL -lglfw
 endif
 
 ifeq ($(OS), Darwin)
