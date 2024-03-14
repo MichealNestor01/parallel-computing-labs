@@ -11,10 +11,11 @@
 #ifdef __APPLE__
 #include <OpenCL/opencl.h>
 #else
+#define CL_TARGET_OPENCL_VERSION 300
 #include <CL/cl.h>
 #endif
 
-int main()
+int main()	
 {
 	// Error code
 	cl_int status;
@@ -140,6 +141,3 @@ break;
 	//
 	free( platformIDs );
 }
-
-
-
