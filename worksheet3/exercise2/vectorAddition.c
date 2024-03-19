@@ -24,7 +24,7 @@
 #include <stdlib.h>
 
 // This file contains routines that help initialising OpenCL, and loading kernels from file.
-#include "helper.h"
+#include "../helper.h"
 
 
 //
@@ -75,12 +75,17 @@ int main( int argc, char **argv )
 	//
 
 	// Build the kernel code 'vectorAdd' contained in the file 'vectorAddition.cl'. This uses a routine in helper.h.
-	cl_kernel kernel = compileKernelFromFile( "vectorAddition.cl", "vectorAdd", context, device );
+	cl_kernel kernel_add = compileKernelFromFile( "vectorAddition.cl", "vectorAdd", context, device );
+	cl_kernel kernel_sub = compileKernelFromFile( "vectorSubtraction.cl", "vectorSub", context, device );
 
 	// Specify the arguments to the kernel.
-	status = clSetKernelArg( kernel, 0, sizeof(cl_mem), &device_a );
-	status = clSetKernelArg( kernel, 1, sizeof(cl_mem), &device_b );
-	status = clSetKernelArg( kernel, 2, sizeof(cl_mem), &device_c );
+	status = clSetKernelArg( kernel_add, 0, sizeof(cl_mem), &device_a );
+	status = clSetKernelArg( kernel_add, 1, sizeof(cl_mem), &device_b );
+	status = clSetKernelArg( kernel_add, 2, sizeof(cl_mem), &device_c );
+
+	status = clSetKernelArg( kernel_sub, 0, sizeof(cl_mem), &device_a );
+	status = clSetKernelArg( kernel_sub, 1, sizeof(cl_mem), &device_b );
+	status = clSetKernelArg( kernel_sub, 2, sizeof(cl_mem), &device_c );
 
 	// Set up the global problem size, and the work group size.
 	size_t indexSpaceSize[1], workGroupSize[1];
@@ -88,7 +93,7 @@ int main( int argc, char **argv )
 	workGroupSize [0] = 128;				// Should match to hardware; can be too large!
 
 	// Put the kernel onto the command queue.
-	status = clEnqueueNDRangeKernel( queue, kernel, 1, NULL, indexSpaceSize, workGroupSize, 0, NULL, NULL );
+	status = clEnqueueNDRangeKernel( queue, kernel_sub, 1, NULL, indexSpaceSize, workGroupSize, 0, NULL, NULL );
 	if( status != CL_SUCCESS )
 	{
 		printf( "Failure enqueuing kernel: Error %d.\n", status );
@@ -110,8 +115,8 @@ int main( int argc, char **argv )
 	for( i=0; i<N; i++ )
 	{
 		// Only print a few values.
-		if( i<10 ) printf( "%g + %g = %g.\n", host_a[i], host_b[i], host_c[i] );
-		if( host_a[i] + host_b[i] != host_c[i] )
+		if( i<10 ) printf( "%g - %g = %g.\n", host_a[i], host_b[i], host_c[i] );
+		if( host_a[i] - host_b[i] != host_c[i] )
 		{
 			printf( "Vector addition FAILED.\n" );
 			break;
@@ -130,7 +135,8 @@ int main( int argc, char **argv )
 	free( host_b );
 	free( host_c );
 
-	clReleaseKernel      ( kernel  );
+	clReleaseKernel      ( kernel_add  );
+	clReleaseKernel      ( kernel_sub  );
 	clReleaseCommandQueue( queue   );
 	clReleaseContext     ( context );
 }
